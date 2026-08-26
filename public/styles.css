@@ -450,6 +450,190 @@ mark {
   font-size: 0.78rem;
 }
 
+.camera-view {
+  overflow: hidden;
+  background: #111017;
+}
+
+.camera-view .page-shell {
+  position: relative;
+  width: min(100%, 430px);
+  height: 100dvh;
+  min-height: 100dvh;
+  padding: 0;
+  overflow: hidden;
+  background: #17131f;
+}
+
+.camera-view .hero {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  right: 16px;
+  left: 16px;
+  z-index: 5;
+  padding: 0;
+  color: white;
+  text-align: left;
+  pointer-events: none;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
+}
+
+.camera-view .hero h1 {
+  font-size: clamp(2rem, 10vw, 2.65rem);
+}
+
+.camera-view .hero h1 em {
+  color: #cbbdff;
+}
+
+.camera-view .hero p {
+  margin-top: 5px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.camera-view .workspace {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: #17131f;
+  box-shadow: none;
+}
+
+.camera-view .experience {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.camera-view .language-picker {
+  position: absolute;
+  top: max(88px, calc(env(safe-area-inset-top) + 72px));
+  right: 12px;
+  left: 12px;
+  z-index: 5;
+  padding: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  background: rgba(18, 14, 27, 0.48);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.camera-view .language-picker legend {
+  margin-bottom: 7px;
+  color: white;
+  font-size: 0.68rem;
+}
+
+.camera-view .language-picker legend span {
+  color: white;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.camera-view .language-options {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.camera-view .language-option span {
+  min-height: 45px;
+  padding: 5px 2px;
+  border-color: rgba(255, 255, 255, 0.16);
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.camera-view .language-option strong {
+  font-size: 0.66rem;
+}
+
+.camera-view .language-option small {
+  color: rgba(255, 255, 255, 0.67);
+  font-size: 0.43rem;
+}
+
+.camera-view .language-option input:checked + span {
+  border-color: white;
+  color: var(--purple-dark);
+  background: white;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+}
+
+.camera-view .language-option input:checked + span small {
+  color: #6c6677;
+}
+
+.camera-view .camera-stage {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+.camera-view .camera-stage::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  content: "";
+  background: linear-gradient(
+    to bottom,
+    rgba(10, 8, 14, 0.5),
+    transparent 32%,
+    transparent 62%,
+    rgba(10, 8, 14, 0.55)
+  );
+  pointer-events: none;
+}
+
+.camera-view .camera-loading,
+.camera-view .open-camera-button,
+.camera-view .shutter-button {
+  z-index: 3;
+}
+
+.camera-view .shutter-button {
+  bottom: max(22px, calc(env(safe-area-inset-bottom) + 16px));
+  width: 70px;
+  height: 70px;
+}
+
+.camera-view .shutter-button span {
+  width: 51px;
+  height: 51px;
+}
+
+.camera-view .camera-status {
+  position: absolute;
+  right: 18px;
+  bottom: max(104px, calc(env(safe-area-inset-bottom) + 96px));
+  left: 18px;
+  z-index: 3;
+  color: rgba(255, 255, 255, 0.84);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+}
+
+.camera-view .camera-status.is-ready,
+.camera-view .camera-status.is-loading,
+.camera-view .camera-status.is-error {
+  color: white;
+}
+
+.camera-view .error-banner {
+  position: absolute;
+  top: max(166px, calc(env(safe-area-inset-top) + 150px));
+  right: 18px;
+  left: 18px;
+  z-index: 8;
+  margin: 0;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+}
+
 @keyframes pulse {
   50% {
     transform: scale(1.25);

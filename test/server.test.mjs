@@ -35,6 +35,7 @@ test("the phone page opens a live rear camera with intuitive language choices", 
   const html = await response.text();
 
   assert.equal(response.status, 200);
+  assert.match(html, /<body class="camera-view">/);
   assert.equal((html.match(/type="radio" name="language"/g) || []).length, 5);
   assert.match(html, /type="hidden" name="voice" value="Ananya"/);
   assert.doesNotMatch(html, /<select|Arjun|type="file"|galleryImage|camera roll/);
@@ -95,7 +96,7 @@ test("the browser script starts camera, replays audio, and records pronunciation
   assert.match(script, /canvas\.toBlob/);
 });
 
-test("the stylesheet is constrained to a modern iPhone-width viewport", async (t) => {
+test("the stylesheet gives the camera a full-height iPhone surface with overlaid languages", async (t) => {
   const server = createAppServer();
   server.listen(0, "127.0.0.1");
   t.after(() => server.close());
@@ -106,8 +107,11 @@ test("the stylesheet is constrained to a modern iPhone-width viewport", async (t
   const css = await response.text();
 
   assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-cache");
   assert.match(css, /width:\s*min\(100%, 430px\)/);
-  assert.match(css, /min-height:\s*100dvh/);
+  assert.match(css, /\.camera-view \.page-shell[^}]+height:\s*100dvh/s);
+  assert.match(css, /\.camera-view \.language-picker[^}]+position:\s*absolute/s);
+  assert.match(css, /grid-template-columns:\s*repeat\(5,/);
   assert.match(css, /safe-area-inset-top/);
 });
 
@@ -144,6 +148,7 @@ test("the result exposes only a simple repeat button for generated speech", () =
   assert.match(html, /<audio preload="auto" data-result-audio/);
   assert.match(html, /data-repeat-audio/);
   assert.match(html, /Repeat again/);
+  assert.match(html, /<body class="result-view">/);
   assert.doesNotMatch(html, /<audio controls|type="range"/);
 });
 

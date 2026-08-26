@@ -5,7 +5,7 @@ Live test site: [https://see-it-say-it.vercel.app](https://see-it-say-it.vercel.
 A deliberately small webpage that:
 
 1. offers five tappable language choices and uses the fixed Ananya voice;
-2. requests the phone's rear camera as soon as the page opens and shows a live camera window with a shutter button;
+2. requests the phone's rear camera as soon as the page opens and shows a full-height camera view with overlaid language controls and a shutter button;
 3. uses the OpenAI Responses API to identify only the main object;
 4. builds and highlights a short local sentence containing the object's word in Malayalam, Hindi, Gujarati, Marathi, or Indian English;
 5. uses Maya 2 Native to speak the word and a short sentence; and

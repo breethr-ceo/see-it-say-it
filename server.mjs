@@ -180,10 +180,10 @@ export function renderPage({ result, error, selectedLanguage = "ml" } = {}) {
     <meta name="theme-color" content="#6842d8">
     <meta name="description" content="Take a photo, learn the word for its main object, and practise saying it in Malayalam, Hindi, Gujarati, Marathi, or Indian English.">
     <title>See It · Say It</title>
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/styles.css?v=fullscreen-camera">
     <script type="module" src="/app.js"></script>
   </head>
-  <body>
+  <body class="${result ? "result-view" : "camera-view"}">
     <main class="page-shell">
       <header class="hero">
         <h1>See it. <em>Say it.</em></h1>
@@ -543,7 +543,7 @@ export async function handleAppRequest(request, response) {
       const css = await readFile(STYLES_PATH);
       response.writeHead(200, {
         "content-type": "text/css; charset=utf-8",
-        "cache-control": "public, max-age=3600",
+        "cache-control": "no-cache",
       });
       response.end(css);
       return;
