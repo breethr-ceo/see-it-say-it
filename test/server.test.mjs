@@ -38,14 +38,33 @@ test("the phone page opens a live rear camera with intuitive language choices", 
   assert.match(html, /<body class="camera-view">/);
   assert.equal((html.match(/type="radio" name="language"/g) || []).length, 5);
   assert.match(html, /type="hidden" name="voice" value="Ananya"/);
+  assert.match(html, /<legend>Choose a language<\/legend>/);
+  assert.doesNotMatch(html, /<header|See it\.|Take a picture|Ananya voice/);
   assert.doesNotMatch(html, /<select|Arjun|type="file"|galleryImage|camera roll/);
   assert.match(html, /<video autoplay muted playsinline/);
   assert.match(html, /data-camera-capture/);
   assert.match(html, /data-camera-start/);
   assert.match(html, /മലയാളം|हिन्दी|ગુજરાતી|मराठी|English/);
   assert.doesNotMatch(html, /language-strip|<footer/);
-  assert.match(html, /<script type="module" src="\/app\.js"><\/script>/);
+  assert.match(html, /<link rel="icon" type="image\/png" href="\/favicon\.png">/);
+  assert.match(html, /<link rel="apple-touch-icon" href="\/favicon\.png">/);
+  assert.match(html, /<script type="module" src="\/app\.js\?v=overlay-results"><\/script>/);
   assert.doesNotMatch(html, /Telugu|Bengali|Kannada|Odia|Punjabi|Tamil/);
+});
+
+test("the supplied PNG is served as the site favicon", async (t) => {
+  const server = createAppServer();
+  server.listen(0, "127.0.0.1");
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const address = server.address();
+  const response = await fetch(`http://127.0.0.1:${address.port}/favicon.png`);
+  const image = Buffer.from(await response.arrayBuffer());
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "image/png");
+  assert.equal(image.subarray(1, 4).toString(), "PNG");
 });
 
 test("the Vercel function entry point reuses the application handler", async () => {
@@ -65,7 +84,8 @@ test("the Vercel home rewrite resolves to the application page", async (t) => {
   const html = await response.text();
 
   assert.equal(response.status, 200);
-  assert.match(html, /See it\. <em>Say it\.<\/em>/);
+  assert.match(html, /<legend>Choose a language<\/legend>/);
+  assert.doesNotMatch(html, /<header|See it\.|Take a picture|Ananya voice/);
 });
 
 test("the browser script starts camera, replays audio, and records pronunciation", async (t) => {
@@ -91,6 +111,9 @@ test("the browser script starts camera, replays audio, and records pronunciation
   assert.match(script, /playResultAudio/);
   assert.match(script, /DOMParser/);
   assert.match(script, /replaceChildren/);
+  assert.match(script, /document\.body\.className/);
+  assert.match(script, /URL\.createObjectURL/);
+  assert.match(script, /data-captured-image/);
   assert.doesNotMatch(script, /document\.write/);
   assert.match(script, /editDistance/);
   assert.match(script, /canvas\.toBlob/);
@@ -109,10 +132,13 @@ test("the stylesheet gives the camera a full-height iPhone surface with overlaid
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "no-cache");
   assert.match(css, /width:\s*min\(100%, 430px\)/);
-  assert.match(css, /\.camera-view \.page-shell[^}]+height:\s*100dvh/s);
-  assert.match(css, /\.camera-view \.language-picker[^}]+position:\s*absolute/s);
+  assert.match(css, /\.page-shell[^}]+height:\s*100dvh/s);
+  assert.match(css, /\.language-picker[^}]+position:\s*absolute/s);
   assert.match(css, /grid-template-columns:\s*repeat\(5,/);
   assert.match(css, /safe-area-inset-top/);
+  assert.match(css, /\.language-picker\[disabled\][^}]+pointer-events:\s*none/s);
+  assert.match(css, /\.result-card[^}]+position:\s*absolute[^}]+bottom:\s*0/s);
+  assert.match(css, /\.captured-image/);
 });
 
 test("the Vercel pronunciation route validates audio uploads as JSON", async (t) => {
@@ -140,6 +166,8 @@ test("the result exposes only a simple repeat button for generated speech", () =
     selectedLanguage: "en",
     result: {
       objectName: "bottle",
+      englishName: "bottle",
+      phoneticSpelling: "BOT-uhl",
       sentence: "This is a bottle.",
       audioBase64: "UklGRg==",
     },
@@ -148,8 +176,28 @@ test("the result exposes only a simple repeat button for generated speech", () =
   assert.match(html, /<audio preload="auto" data-result-audio/);
   assert.match(html, /data-repeat-audio/);
   assert.match(html, /Repeat again/);
-  assert.match(html, /<body class="result-view">/);
+  assert.match(html, /<body class="camera-view result-view">/);
+  assert.match(html, /data-language-frozen/);
+  assert.match(html, /data-captured-image/);
+  assert.match(html, /English<\/span> bottle/);
+  assert.match(html, /Say it<\/span> BOT-uhl/);
+  assert.match(html, /href="\/\?language=en">Click again/);
   assert.doesNotMatch(html, /<audio controls|type="range"/);
+});
+
+test("click-again language query restores an editable selected language", async (t) => {
+  const server = createAppServer();
+  server.listen(0, "127.0.0.1");
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const address = server.address();
+  const response = await fetch(`http://127.0.0.1:${address.port}/?language=gu`);
+  const html = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(html, /name="language" value="gu" checked/);
+  assert.doesNotMatch(html, /data-language-frozen/);
 });
 
 test("the object word is highlighted safely inside its sentence", () => {
@@ -176,25 +224,29 @@ test("pronunciation comparison handles punctuation, near matches, and different 
   assert.equal(soundsCorrect("बाटली", "बाटली", "mr-IN"), true);
 });
 
-test("structured identification is parsed from a Responses API message", () => {
+test("structured identification is parsed from a Gemini candidate", () => {
   const result = parseIdentification({
-    output: [
+    candidates: [
       {
-        type: "message",
-        content: [
-          {
-            type: "output_text",
-            text: JSON.stringify({
-              objectName: "बोतल",
-            }),
-          },
-        ],
+        content: {
+          parts: [
+            {
+              text: JSON.stringify({
+                objectName: "बोतल",
+                englishName: "bottle",
+                phoneticSpelling: "bo-tal",
+              }),
+            },
+          ],
+        },
       },
     ],
   });
 
   assert.deepEqual(result, {
     objectName: "बोतल",
+    englishName: "bottle",
+    phoneticSpelling: "bo-tal",
   });
 });
 
@@ -207,69 +259,101 @@ test("short local templates always reuse the identified word", () => {
   assert.equal(createLearningSentence("bottle", "en"), "This is a bottle.");
 });
 
-test("OpenAI transcription sends a short audio file with the selected language", async () => {
+test("Gemini transcription sends compact inline audio with the selected language", async () => {
   let requestedUrl;
   let requestInit;
   const transcript = await transcribeSpeech({
     audioBytes: Buffer.from([1, 2, 3, 4]),
     mimeType: "audio/webm",
     language: "gu",
-    apiKey: "test-openai-key",
+    apiKey: "test-gemini-key",
     model: "test-transcription-model",
     fetchImpl: async (url, init) => {
       requestedUrl = url;
       requestInit = init;
-      return Response.json({ text: "બોટલ" });
+      return Response.json({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: JSON.stringify({ transcript: "બોટલ" }) }],
+            },
+          },
+        ],
+      });
     },
   });
 
-  assert.equal(requestedUrl, "https://api.openai.com/v1/audio/transcriptions");
-  assert.equal(requestInit.headers.authorization, "Bearer test-openai-key");
-  assert.equal(requestInit.headers["content-type"], undefined);
-  assert.ok(requestInit.body instanceof FormData);
-  assert.equal(requestInit.body.get("model"), "test-transcription-model");
-  assert.equal(requestInit.body.get("language"), "gu");
-  assert.equal(requestInit.body.get("response_format"), "json");
-  const file = requestInit.body.get("file");
-  assert.ok(file instanceof File);
-  assert.equal(file.name, "pronunciation.webm");
-  assert.equal(file.type, "audio/webm");
-  assert.equal(file.size, 4);
+  assert.equal(
+    requestedUrl,
+    "https://generativelanguage.googleapis.com/v1beta/models/test-transcription-model:generateContent",
+  );
+  assert.equal(requestInit.headers["x-goog-api-key"], "test-gemini-key");
+  assert.equal(requestInit.headers["content-type"], "application/json");
+  const requestBody = JSON.parse(requestInit.body);
+  assert.match(requestBody.contents[0].parts[0].text, /Gujarati \(gu-IN\)/);
+  assert.equal(requestBody.contents[0].parts[1].inlineData.mimeType, "audio/webm");
+  assert.equal(requestBody.contents[0].parts[1].inlineData.data, "AQIDBA==");
+  assert.equal(requestBody.generationConfig.maxOutputTokens, 30);
+  assert.deepEqual(requestBody.generationConfig.responseJsonSchema.required, ["transcript"]);
   assert.equal(transcript, "બોટલ");
 });
 
-test("OpenAI request minimizes reasoning, output, prompt, and image tokens", async () => {
+test("Gemini identification minimizes output, prompt, and image tokens", async () => {
+  let requestedUrl;
+  let requestInit;
   let requestBody;
   const result = await identifyMainObject({
     imageBytes: Buffer.from([1, 2, 3]),
     mimeType: "image/png",
     language: "ml",
-    apiKey: "test-openai-key",
+    apiKey: "test-gemini-key",
     model: "test-vision-model",
-    fetchImpl: async (_url, init) => {
+    fetchImpl: async (url, init) => {
+      requestedUrl = url;
+      requestInit = init;
       requestBody = JSON.parse(init.body);
       return new Response(
         JSON.stringify({
-          output_text: JSON.stringify({
-            objectName: "കപ്പ്",
-          }),
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      objectName: "കപ്പ്",
+                      englishName: "cup",
+                      phoneticSpelling: "kappu",
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
     },
   });
 
-  assert.equal(requestBody.model, "test-vision-model");
-  assert.equal(requestBody.store, false);
-  assert.deepEqual(requestBody.reasoning, { effort: "none" });
-  assert.equal(requestBody.max_output_tokens, 50);
-  assert.equal(requestBody.text.verbosity, "low");
-  assert.match(requestBody.input[0].content[0].text, /Malayalam/);
-  assert.ok(requestBody.input[0].content[0].text.length < 50);
-  assert.equal(requestBody.input[0].content[1].detail, "low");
-  assert.match(requestBody.input[0].content[1].image_url, /^data:image\/png;base64,/);
+  assert.equal(
+    requestedUrl,
+    "https://generativelanguage.googleapis.com/v1beta/models/test-vision-model:generateContent",
+  );
+  assert.equal(requestInit.headers["x-goog-api-key"], "test-gemini-key");
+  assert.equal(requestBody.generationConfig.maxOutputTokens, 90);
+  assert.equal(requestBody.generationConfig.mediaResolution, "MEDIA_RESOLUTION_LOW");
+  assert.equal(requestBody.generationConfig.responseMimeType, "application/json");
+  assert.match(requestBody.contents[0].parts[0].text, /Malayalam/);
+  assert.equal(requestBody.contents[0].parts[1].inlineData.mimeType, "image/png");
+  assert.equal(requestBody.contents[0].parts[1].inlineData.data, "AQID");
   assert.equal(result.sentence, "ഇത് ഒരു കപ്പ് ആണ്.");
-  assert.deepEqual(requestBody.text.format.schema.required, ["objectName"]);
+  assert.equal(result.englishName, "cup");
+  assert.equal(result.phoneticSpelling, "kappu");
+  assert.deepEqual(requestBody.generationConfig.responseJsonSchema.required, [
+    "objectName",
+    "englishName",
+    "phoneticSpelling",
+  ]);
 });
 
 test("Maya request uses Maya 2 Native and raw PCM is wrapped as WAV", async () => {

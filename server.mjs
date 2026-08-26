@@ -5,11 +5,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const APP_DIR = fileURLToPath(new URL(".", import.meta.url));
 const STYLES_PATH = new URL("./public/styles.css", import.meta.url);
 const APP_JS_PATH = new URL("./public/app.js", import.meta.url);
+const FAVICON_PATH = new URL("./public/favicon.png", import.meta.url);
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_REQUEST_BYTES = MAX_IMAGE_BYTES + 128 * 1024;
 const MAX_AUDIO_BYTES = 2 * 1024 * 1024;
-const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
-const OPENAI_TRANSCRIPTIONS_URL = "https://api.openai.com/v1/audio/transcriptions";
+const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
+const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
 const MAYA_TTS_URL = "https://tts.mayaresearch.ai/v1/tts";
 const MAYA_MODEL = "Maya 2 Native";
 
@@ -89,6 +90,16 @@ function languageChoiceMarkup(selected) {
     .join("");
 }
 
+function languagePickerMarkup(selected, { frozen = false } = {}) {
+  return `
+      <fieldset class="language-picker"${frozen ? " disabled data-language-frozen" : ""}>
+        <legend>Choose a language</legend>
+        <div class="language-options">
+          ${languageChoiceMarkup(selected)}
+        </div>
+      </fieldset>`;
+}
+
 export function highlightObjectWord(sentence, objectName) {
   const source = String(sentence);
   const target = String(objectName).trim();
@@ -119,12 +130,7 @@ function renderForm({ selectedLanguage = "ml" } = {}) {
     <form class="experience" action="/identify" method="post" enctype="multipart/form-data" data-upload-form>
       <input type="hidden" name="voice" value="Ananya">
 
-      <fieldset class="language-picker">
-        <legend>Choose a language <span>Ananya voice</span></legend>
-        <div class="language-options">
-          ${languageChoiceMarkup(selectedLanguage)}
-        </div>
-      </fieldset>
+      ${languagePickerMarkup(selectedLanguage)}
 
       <div class="camera-stage" data-camera-stage>
         <video autoplay muted playsinline aria-label="Live rear camera" data-camera-video></video>
@@ -143,29 +149,40 @@ export function renderPage({ result, error, selectedLanguage = "ml" } = {}) {
   const languageLocale = LANGUAGE_LOCALES[selectedLanguage] ?? LANGUAGE_LOCALES.ml;
   const resultMarkup = result
     ? `
-      <section class="result-card" aria-labelledby="result-heading" data-pronunciation-card data-target-word="${escapeHtml(result.objectName)}" data-language="${escapeHtml(languageLocale)}">
-        <span class="result-label">Your word</span>
-        <h2 id="result-heading" lang="${escapeHtml(languageLocale)}">${escapeHtml(result.objectName)}</h2>
-        <p class="sentence" lang="${escapeHtml(languageLocale)}">${highlightObjectWord(result.sentence, result.objectName)}</p>
+      <div class="experience result-experience">
+        ${languagePickerMarkup(selectedLanguage, { frozen: true })}
 
-        <audio preload="auto" data-result-audio src="data:audio/wav;base64,${result.audioBase64}"></audio>
-        <button class="repeat-button" type="button" data-repeat-audio>
-          <span aria-hidden="true">↻</span> Repeat again
-        </button>
+        <div class="camera-stage result-camera-stage">
+          <img class="captured-image" data-captured-image alt="The captured object">
+          <section class="result-card" aria-labelledby="result-heading" data-pronunciation-card data-target-word="${escapeHtml(result.objectName)}" data-language="${escapeHtml(languageLocale)}">
+            <div class="word-panel">
+              <span class="result-label">Your word</span>
+              <h2 id="result-heading" lang="${escapeHtml(languageLocale)}">${escapeHtml(result.objectName)}</h2>
+              <p class="english-name"><span>English</span> ${escapeHtml(result.englishName)}</p>
+              <p class="phonetic-spelling"><span>Say it</span> ${escapeHtml(result.phoneticSpelling)}</p>
+              <p class="sentence" lang="${escapeHtml(languageLocale)}">${highlightObjectWord(result.sentence, result.objectName)}</p>
+            </div>
 
-        <div class="practice-card">
-          <strong>Now say <mark lang="${escapeHtml(languageLocale)}">${escapeHtml(result.objectName)}</mark></strong>
-          <button class="microphone-button" type="button" data-pronunciation-start>
-            <span class="microphone-icon" aria-hidden="true">🎙</span>
-            <span data-pronunciation-label>Start recording</span>
-          </button>
-          <div class="pronunciation-feedback" data-pronunciation-feedback role="status" aria-live="polite">
-            Ready when you are.
-          </div>
-          <noscript>Enable JavaScript to use the pronunciation check.</noscript>
+            <audio preload="auto" data-result-audio src="data:audio/wav;base64,${result.audioBase64}"></audio>
+            <button class="repeat-button" type="button" data-repeat-audio>
+              <span aria-hidden="true">↻</span> Repeat again
+            </button>
+
+            <div class="practice-card">
+              <strong>Now say <mark lang="${escapeHtml(languageLocale)}">${escapeHtml(result.objectName)}</mark></strong>
+              <button class="microphone-button" type="button" data-pronunciation-start>
+                <span class="microphone-icon" aria-hidden="true">🎙</span>
+                <span data-pronunciation-label>Start recording</span>
+              </button>
+              <div class="pronunciation-feedback" data-pronunciation-feedback role="status" aria-live="polite">
+                Ready when you are.
+              </div>
+              <noscript>Enable JavaScript to use the pronunciation check.</noscript>
+            </div>
+            <a class="secondary-button" href="/?language=${escapeHtml(selectedLanguage)}">Click again</a>
+          </section>
         </div>
-        <a class="secondary-button" href="/">Take another picture</a>
-      </section>`
+      </div>`
     : "";
 
   const errorMarkup = error
@@ -180,16 +197,13 @@ export function renderPage({ result, error, selectedLanguage = "ml" } = {}) {
     <meta name="theme-color" content="#6842d8">
     <meta name="description" content="Take a photo, learn the word for its main object, and practise saying it in Malayalam, Hindi, Gujarati, Marathi, or Indian English.">
     <title>See It · Say It</title>
-    <link rel="stylesheet" href="/styles.css?v=fullscreen-camera">
-    <script type="module" src="/app.js"></script>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/favicon.png">
+    <link rel="stylesheet" href="/styles.css?v=overlay-results">
+    <script type="module" src="/app.js?v=overlay-results"></script>
   </head>
-  <body class="${result ? "result-view" : "camera-view"}">
+  <body class="camera-view${result ? " result-view" : ""}">
     <main class="page-shell">
-      <header class="hero">
-        <h1>See it. <em>Say it.</em></h1>
-        <p>Take a picture and practise one word.</p>
-      </header>
-
       <section class="workspace" aria-label="Object identification form">
         ${errorMarkup}
         ${resultMarkup || renderForm({ selectedLanguage })}
@@ -220,30 +234,42 @@ function validateLanguage(language) {
   }
 }
 
-function extractOutputText(response) {
-  if (typeof response.output_text === "string" && response.output_text.trim()) {
-    return response.output_text;
+function geminiGenerateContentUrl(model) {
+  const modelId = String(model).trim().replace(/^models\//, "");
+  if (!modelId) {
+    throw new Error("A Gemini model name is required.");
   }
+  return `${GEMINI_API_BASE_URL}/${encodeURIComponent(modelId)}:generateContent`;
+}
 
-  for (const item of response.output ?? []) {
-    if (item?.type !== "message") continue;
-    for (const content of item.content ?? []) {
-      if (content?.type === "output_text" && typeof content.text === "string") {
-        return content.text;
+function extractGeminiText(response) {
+  for (const candidate of response.candidates ?? []) {
+    for (const part of candidate?.content?.parts ?? []) {
+      if (typeof part?.text === "string" && part.text.trim()) {
+        return part.text;
       }
     }
   }
 
-  throw new Error("OpenAI returned no text output.");
+  throw new Error("Gemini returned no text output.");
 }
 
 export function parseIdentification(response) {
-  const parsed = JSON.parse(extractOutputText(response));
-  if (typeof parsed.objectName !== "string" || !parsed.objectName.trim()) {
-    throw new Error("OpenAI returned an incomplete identification.");
+  const parsed = JSON.parse(extractGeminiText(response));
+  if (
+    typeof parsed.objectName !== "string" ||
+    !parsed.objectName.trim() ||
+    typeof parsed.englishName !== "string" ||
+    !parsed.englishName.trim() ||
+    typeof parsed.phoneticSpelling !== "string" ||
+    !parsed.phoneticSpelling.trim()
+  ) {
+    throw new Error("Gemini returned an incomplete identification.");
   }
   return {
     objectName: parsed.objectName.trim(),
+    englishName: parsed.englishName.trim(),
+    phoneticSpelling: parsed.phoneticSpelling.trim(),
   };
 }
 
@@ -252,53 +278,50 @@ export async function identifyMainObject({
   mimeType,
   language,
   apiKey,
-  model = process.env.OPENAI_VISION_MODEL || "gpt-5.6-luna",
+  model = process.env.GEMINI_VISION_MODEL || DEFAULT_GEMINI_MODEL,
   fetchImpl = fetch,
 }) {
-  const openAiKey = requireApiKey("OPENAI_API_KEY", apiKey);
+  const geminiKey = requireApiKey("GEMINI_API_KEY", apiKey);
   const languageName = LANGUAGES[language];
-  const imageDataUrl = `data:${mimeType};base64,${Buffer.from(imageBytes).toString("base64")}`;
+  const imageData = Buffer.from(imageBytes).toString("base64");
 
-  const response = await fetchImpl(OPENAI_RESPONSES_URL, {
+  const response = await fetchImpl(geminiGenerateContentUrl(model), {
     method: "POST",
     headers: {
-      authorization: `Bearer ${openAiKey}`,
+      "x-goog-api-key": geminiKey,
       "content-type": "application/json",
       "user-agent": "see-it-say-it/1.0",
     },
     body: JSON.stringify({
-      model,
-      store: false,
-      reasoning: { effort: "none" },
-      max_output_tokens: 50,
-      instructions:
-        "Identify the single main physical object. Return its most common singular word in the requested language. Use native script for Hindi, Malayalam, Gujarati, and Marathi and standard English for Indian English. If unclear, return the local-language equivalent of 'unclear object'.",
-      input: [
+      contents: [
         {
           role: "user",
-          content: [
+          parts: [
             {
-              type: "input_text",
-              text: `${languageName} (${language}); use native script.`,
+              text: `Identify the single main physical object. Return its common singular name in ${languageName}, its English name, and an easy Latin-letter phonetic spelling of the ${languageName} word (no IPA). Use native script for Malayalam, Hindi, Gujarati, or Marathi. If unclear, use "unclear object" in both languages.`,
             },
-            { type: "input_image", image_url: imageDataUrl, detail: "low" },
+            {
+              inlineData: {
+                mimeType,
+                data: imageData,
+              },
+            },
           ],
         },
       ],
-      text: {
-        verbosity: "low",
-        format: {
-          type: "json_schema",
-          name: "object_label",
-          strict: true,
-          schema: {
-            type: "object",
-            properties: {
-              objectName: { type: "string" },
-            },
-            required: ["objectName"],
-            additionalProperties: false,
+      generationConfig: {
+        maxOutputTokens: 90,
+        mediaResolution: "MEDIA_RESOLUTION_LOW",
+        responseMimeType: "application/json",
+        responseJsonSchema: {
+          type: "object",
+          properties: {
+            objectName: { type: "string" },
+            englishName: { type: "string" },
+            phoneticSpelling: { type: "string" },
           },
+          required: ["objectName", "englishName", "phoneticSpelling"],
+          additionalProperties: false,
         },
       },
     }),
@@ -307,7 +330,7 @@ export async function identifyMainObject({
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`OpenAI request failed (${response.status}): ${detail.slice(0, 500)}`);
+    throw new Error(`Gemini request failed (${response.status}): ${detail.slice(0, 500)}`);
   }
 
   const identification = parseIdentification(await response.json());
@@ -317,53 +340,69 @@ export async function identifyMainObject({
   };
 }
 
-function audioExtension(mimeType) {
-  if (mimeType === "audio/mp4") return "mp4";
-  if (mimeType === "audio/x-m4a") return "m4a";
-  if (mimeType === "audio/ogg") return "ogg";
-  if (mimeType === "audio/wav") return "wav";
-  if (mimeType === "audio/mpeg") return "mp3";
-  return "webm";
-}
-
 export async function transcribeSpeech({
   audioBytes,
   mimeType,
   language,
   apiKey,
-  model = process.env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-mini-transcribe",
+  model = process.env.GEMINI_TRANSCRIPTION_MODEL || DEFAULT_GEMINI_MODEL,
   fetchImpl = fetch,
 }) {
-  const openAiKey = requireApiKey("OPENAI_API_KEY", apiKey);
-  const body = new FormData();
-  body.set(
-    "file",
-    new File([audioBytes], `pronunciation.${audioExtension(mimeType)}`, { type: mimeType }),
-  );
-  body.set("model", model);
-  body.set("language", language);
-  body.set("response_format", "json");
+  const geminiKey = requireApiKey("GEMINI_API_KEY", apiKey);
+  const languageName = LANGUAGES[language];
+  const locale = LANGUAGE_LOCALES[language];
+  const audioData = Buffer.from(audioBytes).toString("base64");
 
-  const response = await fetchImpl(OPENAI_TRANSCRIPTIONS_URL, {
+  const response = await fetchImpl(geminiGenerateContentUrl(model), {
     method: "POST",
     headers: {
-      authorization: `Bearer ${openAiKey}`,
+      "x-goog-api-key": geminiKey,
+      "content-type": "application/json",
       "user-agent": "see-it-say-it/1.0",
     },
-    body,
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: `Transcribe exactly the one spoken word in ${languageName} (${locale}). Use the expected script and do not translate.`,
+            },
+            {
+              inlineData: {
+                mimeType,
+                data: audioData,
+              },
+            },
+          ],
+        },
+      ],
+      generationConfig: {
+        maxOutputTokens: 30,
+        responseMimeType: "application/json",
+        responseJsonSchema: {
+          type: "object",
+          properties: {
+            transcript: { type: "string" },
+          },
+          required: ["transcript"],
+          additionalProperties: false,
+        },
+      },
+    }),
     signal: AbortSignal.timeout(60_000),
   });
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`OpenAI transcription failed (${response.status}): ${detail.slice(0, 500)}`);
+    throw new Error(`Gemini transcription failed (${response.status}): ${detail.slice(0, 500)}`);
   }
 
-  const result = await response.json();
-  if (typeof result.text !== "string" || !result.text.trim()) {
-    throw new Error("OpenAI returned no transcription.");
+  const result = JSON.parse(extractGeminiText(await response.json()));
+  if (typeof result.transcript !== "string" || !result.transcript.trim()) {
+    throw new Error("Gemini returned no transcription.");
   }
-  return result.text.trim();
+  return result.transcript.trim();
 }
 
 export function pcmToWav(pcmInput, sampleRate = 24_000, channels = 1) {
@@ -539,6 +578,16 @@ export async function handleAppRequest(request, response) {
           : url.pathname;
 
   try {
+    if (request.method === "GET" && pathname === "/favicon.png") {
+      const favicon = await readFile(FAVICON_PATH);
+      response.writeHead(200, {
+        "content-type": "image/png",
+        "cache-control": "public, max-age=86400",
+      });
+      response.end(favicon);
+      return;
+    }
+
     if (request.method === "GET" && pathname === "/styles.css") {
       const css = await readFile(STYLES_PATH);
       response.writeHead(200, {
@@ -560,11 +609,15 @@ export async function handleAppRequest(request, response) {
     }
 
     if (request.method === "GET" && pathname === "/") {
+      const requestedLanguage = url.searchParams.get("language");
+      const selectedLanguage = Object.hasOwn(LANGUAGES, requestedLanguage)
+        ? requestedLanguage
+        : "ml";
       response.writeHead(200, {
         "content-type": "text/html; charset=utf-8",
         "cache-control": "no-store",
       });
-      response.end(renderPage());
+      response.end(renderPage({ selectedLanguage }));
       return;
     }
 

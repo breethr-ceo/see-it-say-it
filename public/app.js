@@ -48,13 +48,31 @@ function canvasToBlob(canvas, quality) {
   });
 }
 
-function showServerPage(html) {
+let activeCapturedImageUrl;
+
+function releaseCapturedImage() {
+  if (!activeCapturedImageUrl) return;
+  URL.revokeObjectURL(activeCapturedImageUrl);
+  activeCapturedImageUrl = undefined;
+}
+
+function showServerPage(html, capturedImageUrl) {
   const parsed = new DOMParser().parseFromString(html, "text/html");
   if (!parsed.body.childNodes.length) {
     throw new Error("The result page could not be displayed.");
   }
 
+  const capturedImage = parsed.querySelector("[data-captured-image]");
+  if (capturedImage && capturedImageUrl) {
+    releaseCapturedImage();
+    activeCapturedImageUrl = capturedImageUrl;
+    capturedImage.src = capturedImageUrl;
+  } else if (capturedImageUrl) {
+    URL.revokeObjectURL(capturedImageUrl);
+  }
+
   document.title = parsed.title || document.title;
+  document.body.className = parsed.body.className;
   document.body.replaceChildren(...parsed.body.childNodes);
   window.history.replaceState(null, "", "/");
   window.scrollTo(0, 0);
@@ -138,6 +156,7 @@ function enhancePage() {
       if (!cameraStream || uploadForm.dataset.busy === "true") return;
       uploadForm.dataset.busy = "true";
       shutterButton.disabled = true;
+      let capturedImageUrl;
 
       try {
         if (!video.videoWidth || !video.videoHeight) {
@@ -151,6 +170,7 @@ function enhancePage() {
         if (!context) throw new Error("The camera frame could not be captured.");
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         const picture = await canvasToBlob(canvas, 0.86);
+        capturedImageUrl = URL.createObjectURL(picture);
 
         canvas.hidden = false;
         video.hidden = true;
@@ -165,8 +185,11 @@ function enhancePage() {
           body,
           headers: { accept: "text/html" },
         });
-        showServerPage(await response.text());
+        showServerPage(await response.text(), capturedImageUrl);
       } catch (error) {
+        if (capturedImageUrl && capturedImageUrl !== activeCapturedImageUrl) {
+          URL.revokeObjectURL(capturedImageUrl);
+        }
         stopCamera();
         uploadForm.dataset.busy = "false";
         canvas.hidden = true;
@@ -325,4 +348,7 @@ function enhancePage() {
   });
 }
 
-if (typeof document !== "undefined") enhancePage();
+if (typeof document !== "undefined") {
+  window.addEventListener("pagehide", releaseCapturedImage, { once: true });
+  enhancePage();
+}
