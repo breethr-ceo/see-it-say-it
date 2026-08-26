@@ -1,0 +1,480 @@
+:root {
+  color-scheme: light;
+  --ink: #1d1830;
+  --muted: #6c6677;
+  --purple: #6842d8;
+  --purple-dark: #5030b4;
+  --purple-soft: #f0ebff;
+  --green: #17643f;
+  --green-soft: #e9f7ef;
+  --red: #913d3d;
+  --red-soft: #fff0ee;
+  --line: #e5e1eb;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+  background: #f7f5fa;
+}
+
+body {
+  min-height: 100svh;
+  color: var(--ink);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button,
+label,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.page-shell {
+  width: min(100%, 430px);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: max(12px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
+}
+
+.hero {
+  padding: 0 2px 11px;
+  text-align: center;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2rem, 10vw, 2.7rem);
+  line-height: 1;
+  letter-spacing: -0.055em;
+}
+
+h1 em {
+  color: var(--purple);
+  font-style: normal;
+}
+
+.hero p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.workspace {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 21px;
+  background: white;
+  box-shadow: 0 14px 38px rgba(36, 25, 61, 0.08);
+}
+
+.experience {
+  display: grid;
+  gap: 10px;
+}
+
+.language-picker {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.language-picker legend {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding: 0;
+  color: #4c4655;
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.language-picker legend span {
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: var(--purple-dark);
+  background: var(--purple-soft);
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+
+.language-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.language-option {
+  position: relative;
+  cursor: pointer;
+}
+
+.language-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.language-option span {
+  display: grid;
+  min-height: 49px;
+  padding: 6px 4px;
+  place-content: center;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  text-align: center;
+  background: #faf9fc;
+  transition: 140ms ease;
+}
+
+.language-option strong,
+.language-option small {
+  display: block;
+}
+
+.language-option strong {
+  font-size: 0.78rem;
+  line-height: 1.15;
+}
+
+.language-option small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.52rem;
+  line-height: 1;
+}
+
+.language-option input:checked + span {
+  border-color: var(--purple);
+  color: white;
+  background: var(--purple);
+  box-shadow: 0 6px 14px rgba(80, 48, 180, 0.2);
+}
+
+.language-option input:checked + span small {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.language-option input:focus-visible + span,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid rgba(104, 66, 216, 0.3);
+  outline-offset: 2px;
+}
+
+.camera-stage {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #17131f;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.camera-stage video,
+.camera-stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camera-stage canvas[hidden],
+.camera-stage video[hidden] {
+  display: none;
+}
+
+.camera-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.camera-loading[hidden],
+.open-camera-button[hidden] {
+  display: none;
+}
+
+.open-camera-button {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  min-height: 46px;
+  padding: 0 18px;
+  transform: translate(-50%, -50%);
+  border: 0;
+  border-radius: 999px;
+  color: white;
+  background: var(--purple);
+  font-size: 0.8rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.shutter-button {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  display: grid;
+  width: 62px;
+  height: 62px;
+  padding: 5px;
+  transform: translateX(-50%);
+  place-items: center;
+  border: 3px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  background: rgba(17, 12, 24, 0.3);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  touch-action: manipulation;
+}
+
+.shutter-button span {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 120ms ease;
+}
+
+.shutter-button:active span {
+  transform: scale(0.88);
+}
+
+.shutter-button:disabled {
+  cursor: wait;
+  opacity: 0.38;
+}
+
+.camera-stage.is-captured .shutter-button {
+  display: none;
+}
+
+.camera-status {
+  min-height: 18px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.camera-status.is-ready {
+  color: var(--green);
+}
+
+.camera-status.is-loading {
+  color: var(--purple-dark);
+}
+
+.camera-status.is-error {
+  color: var(--red);
+}
+
+.error-banner {
+  margin-bottom: 10px;
+  padding: 11px;
+  border-radius: 11px;
+  color: var(--red);
+  background: var(--red-soft);
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+.result-card {
+  display: grid;
+  gap: 12px;
+  text-align: center;
+}
+
+.result-label {
+  color: var(--purple);
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.result-card h2 {
+  margin: -4px 0 0;
+  font-size: clamp(2.5rem, 13vw, 3.8rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+mark {
+  color: inherit;
+  background: none;
+}
+
+.object-highlight,
+.practice-card mark {
+  padding: 0 0.12em;
+  border-radius: 0.25em;
+  color: var(--purple-dark);
+  background: #e8dfff;
+  font-weight: 850;
+}
+
+.sentence {
+  margin: 0;
+  color: #41394d;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+[data-result-audio] {
+  display: none;
+}
+
+.repeat-button,
+.microphone-button,
+.secondary-button {
+  display: flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 13px;
+  font-weight: 850;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.repeat-button {
+  border: 1.5px solid var(--purple);
+  color: var(--purple-dark);
+  background: white;
+}
+
+.repeat-button span {
+  font-size: 1.15rem;
+}
+
+.practice-card {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border-radius: 15px;
+  background: var(--purple-soft);
+}
+
+.practice-card > strong {
+  font-size: 0.9rem;
+}
+
+.microphone-button {
+  width: 100%;
+  padding: 0 14px;
+  border: 0;
+  color: white;
+  background: var(--purple);
+}
+
+.microphone-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.microphone-button.is-listening {
+  background: #b63d4f;
+}
+
+.microphone-icon {
+  font-size: 1.15rem;
+}
+
+.is-listening .microphone-icon {
+  animation: pulse 850ms ease-in-out infinite;
+}
+
+.pronunciation-feedback {
+  min-height: 34px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.7);
+  font-size: 0.71rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.pronunciation-feedback.is-correct {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.pronunciation-feedback.is-retry {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.pronunciation-feedback.is-listening {
+  color: var(--purple-dark);
+  background: white;
+}
+
+.pronunciation-feedback.is-unsupported {
+  color: #625c69;
+  background: #efedf1;
+}
+
+.secondary-button {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  color: var(--purple-dark);
+  background: white;
+  font-size: 0.78rem;
+}
+
+@keyframes pulse {
+  50% {
+    transform: scale(1.25);
+  }
+}
+
+@media (max-height: 740px) {
+  .page-shell {
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+
+  .hero {
+    padding-bottom: 8px;
+  }
+
+  .camera-stage {
+    aspect-ratio: 16 / 10;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

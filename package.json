@@ -1,0 +1,18 @@
+{
+  "name": "see-it-say-it",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A phone-first object vocabulary and pronunciation demo using vision AI and Maya 2 Native.",
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env server.mjs",
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test",
+    "vercel:dev": "vercel dev",
+    "deploy:preview": "vercel deploy",
+    "deploy:production": "vercel deploy --prod"
+  }
+}

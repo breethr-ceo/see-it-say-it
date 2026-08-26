@@ -1,0 +1,23 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "functions": {
+    "api/app.mjs": {
+      "maxDuration": 300
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/api/app?__route=home"
+    },
+    {
+      "source": "/identify",
+      "destination": "/api/app?__route=identify"
+    },
+    {
+      "source": "/pronounce",
+      "destination": "/api/app?__route=pronounce"
+    }
+  ]
+}
