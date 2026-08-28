@@ -14,6 +14,8 @@ A deliberately small webpage that:
 
 The browser receives HTML, CSS, a small interaction script, and WAV audio. Neither API key is sent to the browser.
 
+The supplied chat-bubble artwork is installed with a transparent outer background as the browser favicon, Apple touch icon, and web-app manifest icon. Source and generated sizes live in `public/app-icon.png`, `public/app-icon-512.png`, `public/app-icon-192.png`, `public/apple-touch-icon.png`, `public/favicon-32.png`, and `public/favicon-16.png`.
+
 ## Requirements
 
 - Node.js 22.13 or newer

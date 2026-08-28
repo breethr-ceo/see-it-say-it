@@ -5,7 +5,22 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const APP_DIR = fileURLToPath(new URL(".", import.meta.url));
 const STYLES_PATH = new URL("./public/styles.css", import.meta.url);
 const APP_JS_PATH = new URL("./public/app.js", import.meta.url);
-const FAVICON_PATH = new URL("./public/favicon.png", import.meta.url);
+const PUBLIC_ASSETS = new Map([
+  ["/favicon.png", { path: new URL("./public/favicon.png", import.meta.url), type: "image/png" }],
+  ["/favicon-32.png", { path: new URL("./public/favicon-32.png", import.meta.url), type: "image/png" }],
+  ["/favicon-16.png", { path: new URL("./public/favicon-16.png", import.meta.url), type: "image/png" }],
+  ["/apple-touch-icon.png", { path: new URL("./public/apple-touch-icon.png", import.meta.url), type: "image/png" }],
+  ["/app-icon-192.png", { path: new URL("./public/app-icon-192.png", import.meta.url), type: "image/png" }],
+  ["/app-icon-512.png", { path: new URL("./public/app-icon-512.png", import.meta.url), type: "image/png" }],
+  ["/app-icon.png", { path: new URL("./public/app-icon.png", import.meta.url), type: "image/png" }],
+  [
+    "/site.webmanifest",
+    {
+      path: new URL("./public/site.webmanifest", import.meta.url),
+      type: "application/manifest+json; charset=utf-8",
+    },
+  ],
+]);
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_REQUEST_BYTES = MAX_IMAGE_BYTES + 128 * 1024;
 const MAX_AUDIO_BYTES = 2 * 1024 * 1024;
@@ -193,9 +208,13 @@ export function renderPage({ result, error, selectedLanguage = "ml" } = {}) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#6842d8">
     <meta name="description" content="Take a photo, learn the word for its main object, and practise saying it in Kannada, Tamil, Gujarati, Marathi, or Malayalam.">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="See It · Say It">
     <title>See It · Say It</title>
-    <link rel="icon" type="image/png" href="/favicon.png">
-    <link rel="apple-touch-icon" href="/favicon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/site.webmanifest">
     <link rel="stylesheet" href="/styles.css?v=openai-pronunciation">
     <script type="module" src="/app.js?v=openai-pronunciation"></script>
   </head>
@@ -574,13 +593,14 @@ export async function handleAppRequest(request, response) {
           : url.pathname;
 
   try {
-    if (request.method === "GET" && pathname === "/favicon.png") {
-      const favicon = await readFile(FAVICON_PATH);
+    if (request.method === "GET" && PUBLIC_ASSETS.has(pathname)) {
+      const asset = PUBLIC_ASSETS.get(pathname);
+      const contents = await readFile(asset.path);
       response.writeHead(200, {
-        "content-type": "image/png",
+        "content-type": asset.type,
         "cache-control": "public, max-age=86400",
       });
-      response.end(favicon);
+      response.end(contents);
       return;
     }
 

@@ -46,25 +46,68 @@ test("the phone page opens a live rear camera with intuitive language choices", 
   assert.match(html, /data-camera-start/);
   assert.match(html, /ಕನ್ನಡ|தமிழ்|ગુજરાતી|मराठी|മലയാളം/);
   assert.doesNotMatch(html, /language-strip|<footer/);
-  assert.match(html, /<link rel="icon" type="image\/png" href="\/favicon\.png">/);
-  assert.match(html, /<link rel="apple-touch-icon" href="\/favicon\.png">/);
+  assert.match(html, /<link rel="icon" type="image\/png" sizes="32x32" href="\/favicon-32\.png">/);
+  assert.match(html, /<link rel="icon" type="image\/png" sizes="16x16" href="\/favicon-16\.png">/);
+  assert.match(html, /<link rel="apple-touch-icon" sizes="180x180" href="\/apple-touch-icon\.png">/);
+  assert.match(html, /<link rel="manifest" href="\/site\.webmanifest">/);
+  assert.match(html, /<meta name="apple-mobile-web-app-capable" content="yes">/);
   assert.match(html, /<script type="module" src="\/app\.js\?v=openai-pronunciation"><\/script>/);
   assert.doesNotMatch(html, /Indian English|Hindi|हिन्दी|English<\/small>/);
 });
 
-test("the supplied PNG is served as the site favicon", async (t) => {
+test("transparent favicon and app icon sizes are served", async (t) => {
   const server = createAppServer();
   server.listen(0, "127.0.0.1");
   t.after(() => server.close());
   await once(server, "listening");
 
   const address = server.address();
-  const response = await fetch(`http://127.0.0.1:${address.port}/favicon.png`);
-  const image = Buffer.from(await response.arrayBuffer());
+  const expectedSizes = new Map([
+    ["/favicon.png", 64],
+    ["/favicon-32.png", 32],
+    ["/favicon-16.png", 16],
+    ["/apple-touch-icon.png", 180],
+    ["/app-icon-192.png", 192],
+    ["/app-icon-512.png", 512],
+    ["/app-icon.png", 1024],
+  ]);
+
+  for (const [pathname, size] of expectedSizes) {
+    const response = await fetch(`http://127.0.0.1:${address.port}${pathname}`);
+    const image = Buffer.from(await response.arrayBuffer());
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("content-type"), "image/png");
+    assert.equal(image.subarray(1, 4).toString(), "PNG");
+    assert.equal(image.readUInt32BE(16), size);
+    assert.equal(image.readUInt32BE(20), size);
+    assert.equal(image[25], 6, `${pathname} must use an alpha channel`);
+  }
+});
+
+test("the web app manifest points to installable icon sizes", async (t) => {
+  const server = createAppServer();
+  server.listen(0, "127.0.0.1");
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const address = server.address();
+  const response = await fetch(`http://127.0.0.1:${address.port}/site.webmanifest`);
+  const manifest = await response.json();
 
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get("content-type"), "image/png");
-  assert.equal(image.subarray(1, 4).toString(), "PNG");
+  assert.equal(
+    response.headers.get("content-type"),
+    "application/manifest+json; charset=utf-8",
+  );
+  assert.equal(manifest.display, "standalone");
+  assert.deepEqual(
+    manifest.icons.map(({ src, sizes, purpose }) => ({ src, sizes, purpose })),
+    [
+      { src: "/app-icon-192.png", sizes: "192x192", purpose: "any" },
+      { src: "/app-icon-512.png", sizes: "512x512", purpose: "any" },
+    ],
+  );
 });
 
 test("the Vercel function entry point reuses the application handler", async () => {
