@@ -9,33 +9,35 @@ const FAVICON_PATH = new URL("./public/favicon.png", import.meta.url);
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_REQUEST_BYTES = MAX_IMAGE_BYTES + 128 * 1024;
 const MAX_AUDIO_BYTES = 2 * 1024 * 1024;
-const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
-const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
+const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
+const OPENAI_TRANSCRIPTIONS_URL = "https://api.openai.com/v1/audio/transcriptions";
+const DEFAULT_OPENAI_VISION_MODEL = "gpt-5.6-luna";
+const DEFAULT_OPENAI_TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe";
 const MAYA_TTS_URL = "https://tts.mayaresearch.ai/v1/tts";
 const MAYA_MODEL = "Maya 2 Native";
 
 export const LANGUAGES = Object.freeze({
-  ml: "Malayalam",
-  hi: "Hindi",
+  kn: "Kannada",
+  ta: "Tamil",
   gu: "Gujarati",
   mr: "Marathi",
-  en: "Indian English",
+  ml: "Malayalam",
 });
 
 const LANGUAGE_LOCALES = Object.freeze({
-  ml: "ml-IN",
-  hi: "hi-IN",
+  kn: "kn-IN",
+  ta: "ta-IN",
   gu: "gu-IN",
   mr: "mr-IN",
-  en: "en-IN",
+  ml: "ml-IN",
 });
 
 const LANGUAGE_NATIVE_LABELS = Object.freeze({
-  ml: "മലയാളം",
-  hi: "हिन्दी",
+  kn: "ಕನ್ನಡ",
+  ta: "தமிழ்",
   gu: "ગુજરાતી",
   mr: "मराठी",
-  en: "English",
+  ml: "മലയാളം",
 });
 
 export const VOICES = Object.freeze({
@@ -115,13 +117,10 @@ export function highlightObjectWord(sentence, objectName) {
 
 export function createLearningSentence(objectName, language) {
   const word = String(objectName).trim();
-  if (language === "hi") return `यह एक ${word} है।`;
+  if (language === "kn") return `ಇದು ಒಂದು ${word}.`;
+  if (language === "ta") return `இது ஒரு ${word}.`;
   if (language === "gu") return `આ એક ${word} છે.`;
   if (language === "mr") return `हे एक ${word} आहे.`;
-  if (language === "en") {
-    const article = /^[aeiou]/i.test(word) ? "an" : "a";
-    return `This is ${article} ${word}.`;
-  }
   return `ഇത് ഒരു ${word} ആണ്.`;
 }
 
@@ -159,7 +158,7 @@ export function renderPage({ result, error, selectedLanguage = "ml" } = {}) {
               <span class="result-label">Your word</span>
               <h2 id="result-heading" lang="${escapeHtml(languageLocale)}">${escapeHtml(result.objectName)}</h2>
               <p class="english-name"><span>English</span> ${escapeHtml(result.englishName)}</p>
-              <p class="phonetic-spelling"><span>Say it</span> ${escapeHtml(result.phoneticSpelling)}</p>
+              <p class="pronunciation-guide"><span>Say it</span> ${escapeHtml(result.pronunciationGuide)}</p>
               <p class="sentence" lang="${escapeHtml(languageLocale)}">${highlightObjectWord(result.sentence, result.objectName)}</p>
             </div>
 
@@ -174,9 +173,7 @@ export function renderPage({ result, error, selectedLanguage = "ml" } = {}) {
                 <span class="microphone-icon" aria-hidden="true">🎙</span>
                 <span data-pronunciation-label>Start recording</span>
               </button>
-              <div class="pronunciation-feedback" data-pronunciation-feedback role="status" aria-live="polite">
-                Ready when you are.
-              </div>
+              <div class="pronunciation-feedback" data-pronunciation-feedback role="status" aria-live="polite"></div>
               <noscript>Enable JavaScript to use the pronunciation check.</noscript>
             </div>
             <a class="secondary-button" href="/?language=${escapeHtml(selectedLanguage)}">Click again</a>
@@ -195,12 +192,12 @@ export function renderPage({ result, error, selectedLanguage = "ml" } = {}) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#6842d8">
-    <meta name="description" content="Take a photo, learn the word for its main object, and practise saying it in Malayalam, Hindi, Gujarati, Marathi, or Indian English.">
+    <meta name="description" content="Take a photo, learn the word for its main object, and practise saying it in Kannada, Tamil, Gujarati, Marathi, or Malayalam.">
     <title>See It · Say It</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/favicon.png">
-    <link rel="stylesheet" href="/styles.css?v=overlay-results">
-    <script type="module" src="/app.js?v=overlay-results"></script>
+    <link rel="stylesheet" href="/styles.css?v=openai-pronunciation">
+    <script type="module" src="/app.js?v=openai-pronunciation"></script>
   </head>
   <body class="camera-view${result ? " result-view" : ""}">
     <main class="page-shell">
@@ -234,42 +231,42 @@ function validateLanguage(language) {
   }
 }
 
-function geminiGenerateContentUrl(model) {
-  const modelId = String(model).trim().replace(/^models\//, "");
-  if (!modelId) {
-    throw new Error("A Gemini model name is required.");
+function extractOpenAIText(response) {
+  if (typeof response.output_text === "string" && response.output_text.trim()) {
+    return response.output_text;
   }
-  return `${GEMINI_API_BASE_URL}/${encodeURIComponent(modelId)}:generateContent`;
-}
 
-function extractGeminiText(response) {
-  for (const candidate of response.candidates ?? []) {
-    for (const part of candidate?.content?.parts ?? []) {
-      if (typeof part?.text === "string" && part.text.trim()) {
-        return part.text;
+  for (const item of response.output ?? []) {
+    for (const content of item?.content ?? []) {
+      if (
+        content?.type === "output_text" &&
+        typeof content.text === "string" &&
+        content.text.trim()
+      ) {
+        return content.text;
       }
     }
   }
 
-  throw new Error("Gemini returned no text output.");
+  throw new Error("OpenAI returned no text output.");
 }
 
 export function parseIdentification(response) {
-  const parsed = JSON.parse(extractGeminiText(response));
+  const parsed = JSON.parse(extractOpenAIText(response));
   if (
     typeof parsed.objectName !== "string" ||
     !parsed.objectName.trim() ||
     typeof parsed.englishName !== "string" ||
     !parsed.englishName.trim() ||
-    typeof parsed.phoneticSpelling !== "string" ||
-    !parsed.phoneticSpelling.trim()
+    typeof parsed.pronunciationGuide !== "string" ||
+    !parsed.pronunciationGuide.trim()
   ) {
-    throw new Error("Gemini returned an incomplete identification.");
+    throw new Error("OpenAI returned an incomplete identification.");
   }
   return {
     objectName: parsed.objectName.trim(),
     englishName: parsed.englishName.trim(),
-    phoneticSpelling: parsed.phoneticSpelling.trim(),
+    pronunciationGuide: parsed.pronunciationGuide.trim(),
   };
 }
 
@@ -278,50 +275,58 @@ export async function identifyMainObject({
   mimeType,
   language,
   apiKey,
-  model = process.env.GEMINI_VISION_MODEL || DEFAULT_GEMINI_MODEL,
+  model = process.env.OPENAI_VISION_MODEL || DEFAULT_OPENAI_VISION_MODEL,
   fetchImpl = fetch,
 }) {
-  const geminiKey = requireApiKey("GEMINI_API_KEY", apiKey);
+  const openAIKey = requireApiKey("OPENAI_API_KEY", apiKey);
   const languageName = LANGUAGES[language];
-  const imageData = Buffer.from(imageBytes).toString("base64");
+  const imageDataUrl = `data:${mimeType};base64,${Buffer.from(imageBytes).toString("base64")}`;
 
-  const response = await fetchImpl(geminiGenerateContentUrl(model), {
+  const response = await fetchImpl(OPENAI_RESPONSES_URL, {
     method: "POST",
     headers: {
-      "x-goog-api-key": geminiKey,
+      authorization: `Bearer ${openAIKey}`,
       "content-type": "application/json",
       "user-agent": "see-it-say-it/1.0",
     },
     body: JSON.stringify({
-      contents: [
+      model,
+      store: false,
+      reasoning: { effort: "none" },
+      max_output_tokens: 90,
+      instructions: `Identify the single main physical object in the image. Return its common singular name in ${languageName}, its English name, and a pronunciation guide for the ${languageName} word. Use the native ${languageName} script for objectName. pronunciationGuide must show exactly how objectName sounds, syllable by syllable, using only simple Latin letters that an English reader can follow. It must not be the English translation. Separate syllables with hyphens, use doubled vowels where needed for long sounds, and use capitals only when they make emphasis clearer. Do not use IPA. If the image is unclear, use the ${languageName} equivalent of "unclear object" and provide its pronunciation.`,
+      input: [
         {
           role: "user",
-          parts: [
+          content: [
             {
-              text: `Identify the single main physical object. Return its common singular name in ${languageName}, its English name, and an easy Latin-letter phonetic spelling of the ${languageName} word (no IPA). Use native script for Malayalam, Hindi, Gujarati, or Marathi. If unclear, use "unclear object" in both languages.`,
+              type: "input_text",
+              text: `${languageName} (${language}); return one main object only.`,
             },
             {
-              inlineData: {
-                mimeType,
-                data: imageData,
-              },
+              type: "input_image",
+              image_url: imageDataUrl,
+              detail: "low",
             },
           ],
         },
       ],
-      generationConfig: {
-        maxOutputTokens: 90,
-        mediaResolution: "MEDIA_RESOLUTION_LOW",
-        responseMimeType: "application/json",
-        responseJsonSchema: {
-          type: "object",
-          properties: {
-            objectName: { type: "string" },
-            englishName: { type: "string" },
-            phoneticSpelling: { type: "string" },
+      text: {
+        verbosity: "low",
+        format: {
+          type: "json_schema",
+          name: "object_identification",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              objectName: { type: "string" },
+              englishName: { type: "string" },
+              pronunciationGuide: { type: "string" },
+            },
+            required: ["objectName", "englishName", "pronunciationGuide"],
+            additionalProperties: false,
           },
-          required: ["objectName", "englishName", "phoneticSpelling"],
-          additionalProperties: false,
         },
       },
     }),
@@ -330,7 +335,7 @@ export async function identifyMainObject({
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Gemini request failed (${response.status}): ${detail.slice(0, 500)}`);
+    throw new Error(`OpenAI request failed (${response.status}): ${detail.slice(0, 500)}`);
   }
 
   const identification = parseIdentification(await response.json());
@@ -345,64 +350,55 @@ export async function transcribeSpeech({
   mimeType,
   language,
   apiKey,
-  model = process.env.GEMINI_TRANSCRIPTION_MODEL || DEFAULT_GEMINI_MODEL,
+  model = process.env.OPENAI_TRANSCRIPTION_MODEL || DEFAULT_OPENAI_TRANSCRIPTION_MODEL,
   fetchImpl = fetch,
 }) {
-  const geminiKey = requireApiKey("GEMINI_API_KEY", apiKey);
+  const openAIKey = requireApiKey("OPENAI_API_KEY", apiKey);
   const languageName = LANGUAGES[language];
   const locale = LANGUAGE_LOCALES[language];
-  const audioData = Buffer.from(audioBytes).toString("base64");
+  const extensionByType = {
+    "audio/mp4": "m4a",
+    "audio/mpeg": "mp3",
+    "audio/ogg": "ogg",
+    "audio/wav": "wav",
+    "audio/webm": "webm",
+    "audio/x-m4a": "m4a",
+  };
+  const form = new FormData();
+  form.set(
+    "file",
+    new File([audioBytes], `pronunciation.${extensionByType[mimeType] ?? "webm"}`, {
+      type: mimeType,
+    }),
+  );
+  form.set("model", model);
+  form.set("language", language);
+  form.set("response_format", "json");
+  form.set(
+    "prompt",
+    `Transcribe exactly one spoken word in ${languageName} (${locale}) using the native script. Do not translate.`,
+  );
 
-  const response = await fetchImpl(geminiGenerateContentUrl(model), {
+  const response = await fetchImpl(OPENAI_TRANSCRIPTIONS_URL, {
     method: "POST",
     headers: {
-      "x-goog-api-key": geminiKey,
-      "content-type": "application/json",
+      authorization: `Bearer ${openAIKey}`,
       "user-agent": "see-it-say-it/1.0",
     },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: `Transcribe exactly the one spoken word in ${languageName} (${locale}). Use the expected script and do not translate.`,
-            },
-            {
-              inlineData: {
-                mimeType,
-                data: audioData,
-              },
-            },
-          ],
-        },
-      ],
-      generationConfig: {
-        maxOutputTokens: 30,
-        responseMimeType: "application/json",
-        responseJsonSchema: {
-          type: "object",
-          properties: {
-            transcript: { type: "string" },
-          },
-          required: ["transcript"],
-          additionalProperties: false,
-        },
-      },
-    }),
+    body: form,
     signal: AbortSignal.timeout(60_000),
   });
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Gemini transcription failed (${response.status}): ${detail.slice(0, 500)}`);
+    throw new Error(`OpenAI transcription failed (${response.status}): ${detail.slice(0, 500)}`);
   }
 
-  const result = JSON.parse(extractGeminiText(await response.json()));
-  if (typeof result.transcript !== "string" || !result.transcript.trim()) {
-    throw new Error("Gemini returned no transcription.");
+  const result = await response.json();
+  if (typeof result.text !== "string" || !result.text.trim()) {
+    throw new Error("OpenAI returned no transcription.");
   }
-  return result.transcript.trim();
+  return result.text.trim();
 }
 
 export function pcmToWav(pcmInput, sampleRate = 24_000, channels = 1) {

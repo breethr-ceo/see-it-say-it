@@ -21,7 +21,7 @@ import {
 
 test("Maya 2 Native settings match the documented roster", () => {
   assert.deepEqual(Object.keys(VOICES), ["Ananya"]);
-  assert.deepEqual(Object.keys(LANGUAGES), ["ml", "hi", "gu", "mr", "en"]);
+  assert.deepEqual(Object.keys(LANGUAGES), ["kn", "ta", "gu", "mr", "ml"]);
 });
 
 test("the phone page opens a live rear camera with intuitive language choices", async (t) => {
@@ -44,12 +44,12 @@ test("the phone page opens a live rear camera with intuitive language choices", 
   assert.match(html, /<video autoplay muted playsinline/);
   assert.match(html, /data-camera-capture/);
   assert.match(html, /data-camera-start/);
-  assert.match(html, /മലയാളം|हिन्दी|ગુજરાતી|मराठी|English/);
+  assert.match(html, /ಕನ್ನಡ|தமிழ்|ગુજરાતી|मराठी|മലയാളം/);
   assert.doesNotMatch(html, /language-strip|<footer/);
   assert.match(html, /<link rel="icon" type="image\/png" href="\/favicon\.png">/);
   assert.match(html, /<link rel="apple-touch-icon" href="\/favicon\.png">/);
-  assert.match(html, /<script type="module" src="\/app\.js\?v=overlay-results"><\/script>/);
-  assert.doesNotMatch(html, /Telugu|Bengali|Kannada|Odia|Punjabi|Tamil/);
+  assert.match(html, /<script type="module" src="\/app\.js\?v=openai-pronunciation"><\/script>/);
+  assert.doesNotMatch(html, /Indian English|Hindi|हिन्दी|English<\/small>/);
 });
 
 test("the supplied PNG is served as the site favicon", async (t) => {
@@ -138,6 +138,9 @@ test("the stylesheet gives the camera a full-height iPhone surface with overlaid
   assert.match(css, /safe-area-inset-top/);
   assert.match(css, /\.language-picker\[disabled\][^}]+pointer-events:\s*none/s);
   assert.match(css, /\.result-card[^}]+position:\s*absolute[^}]+bottom:\s*0/s);
+  assert.match(css, /\.result-card[^}]+rgba\(20, 16, 29, 0\.18\)/s);
+  assert.doesNotMatch(css, /\.result-card[^}]+rgba\(20, 16, 29, 0\.82\)/s);
+  assert.match(css, /\.pronunciation-feedback:empty\s*{[^}]+display:\s*none/s);
   assert.match(css, /\.captured-image/);
 });
 
@@ -163,12 +166,12 @@ test("the Vercel pronunciation route validates audio uploads as JSON", async (t)
 
 test("the result exposes only a simple repeat button for generated speech", () => {
   const html = renderPage({
-    selectedLanguage: "en",
+    selectedLanguage: "ta",
     result: {
-      objectName: "bottle",
+      objectName: "பாட்டில்",
       englishName: "bottle",
-      phoneticSpelling: "BOT-uhl",
-      sentence: "This is a bottle.",
+      pronunciationGuide: "paa-ttil",
+      sentence: "இது ஒரு பாட்டில்.",
       audioBase64: "UklGRg==",
     },
   });
@@ -180,8 +183,9 @@ test("the result exposes only a simple repeat button for generated speech", () =
   assert.match(html, /data-language-frozen/);
   assert.match(html, /data-captured-image/);
   assert.match(html, /English<\/span> bottle/);
-  assert.match(html, /Say it<\/span> BOT-uhl/);
-  assert.match(html, /href="\/\?language=en">Click again/);
+  assert.match(html, /Say it<\/span> paa-ttil/);
+  assert.match(html, /href="\/\?language=ta">Click again/);
+  assert.doesNotMatch(html, /Ready when you are/);
   assert.doesNotMatch(html, /<audio controls|type="range"/);
 });
 
@@ -202,8 +206,8 @@ test("click-again language query restores an editable selected language", async 
 
 test("the object word is highlighted safely inside its sentence", () => {
   assert.equal(
-    highlightObjectWord("यह एक बोतल है।", "बोतल"),
-    'यह एक <mark class="object-highlight">बोतल</mark> है।',
+    highlightObjectWord("இது ஒரு பாட்டில்.", "பாட்டில்"),
+    'இது ஒரு <mark class="object-highlight">பாட்டில்</mark>.',
   );
   assert.equal(
     highlightObjectWord("A <cup> is here.", "<cup>"),
@@ -218,87 +222,83 @@ test("pronunciation comparison handles punctuation, near matches, and different 
   assert.equal(soundsCorrect("I said bottle", "bottle", "en-IN"), true);
   assert.equal(soundsCorrect("battle", "bottle", "en-IN"), false);
   assert.equal(soundsCorrect("table", "bottle", "en-IN"), false);
-  assert.equal(soundsCorrect("बोतल", "बोतल", "hi-IN"), true);
+  assert.equal(soundsCorrect("ಬಾಟಲಿ", "ಬಾಟಲಿ", "kn-IN"), true);
+  assert.equal(soundsCorrect("பாட்டில்", "பாட்டில்", "ta-IN"), true);
   assert.equal(soundsCorrect("കപ്പ്", "കപ്പ്", "ml-IN"), true);
   assert.equal(soundsCorrect("બોટલ", "બોટલ", "gu-IN"), true);
   assert.equal(soundsCorrect("बाटली", "बाटली", "mr-IN"), true);
 });
 
-test("structured identification is parsed from a Gemini candidate", () => {
+test("structured identification is parsed from an OpenAI response", () => {
   const result = parseIdentification({
-    candidates: [
+    output: [
       {
-        content: {
-          parts: [
-            {
-              text: JSON.stringify({
-                objectName: "बोतल",
-                englishName: "bottle",
-                phoneticSpelling: "bo-tal",
-              }),
-            },
-          ],
-        },
+        type: "message",
+        content: [
+          {
+            type: "output_text",
+            text: JSON.stringify({
+              objectName: "பாட்டில்",
+              englishName: "bottle",
+              pronunciationGuide: "paa-ttil",
+            }),
+          },
+        ],
       },
     ],
   });
 
   assert.deepEqual(result, {
-    objectName: "बोतल",
+    objectName: "பாட்டில்",
     englishName: "bottle",
-    phoneticSpelling: "bo-tal",
+    pronunciationGuide: "paa-ttil",
   });
 });
 
 test("short local templates always reuse the identified word", () => {
-  assert.equal(createLearningSentence("കപ്പ്", "ml"), "ഇത് ഒരു കപ്പ് ആണ്.");
-  assert.equal(createLearningSentence("बोतल", "hi"), "यह एक बोतल है।");
+  assert.equal(createLearningSentence("ಬಾಟಲಿ", "kn"), "ಇದು ಒಂದು ಬಾಟಲಿ.");
+  assert.equal(createLearningSentence("பாட்டில்", "ta"), "இது ஒரு பாட்டில்.");
   assert.equal(createLearningSentence("બોટલ", "gu"), "આ એક બોટલ છે.");
   assert.equal(createLearningSentence("बाटली", "mr"), "हे एक बाटली आहे.");
-  assert.equal(createLearningSentence("apple", "en"), "This is an apple.");
-  assert.equal(createLearningSentence("bottle", "en"), "This is a bottle.");
+  assert.equal(createLearningSentence("കപ്പ്", "ml"), "ഇത് ഒരു കപ്പ് ആണ്.");
 });
 
-test("Gemini transcription sends compact inline audio with the selected language", async () => {
+test("OpenAI transcription sends short audio with the selected language", async () => {
   let requestedUrl;
   let requestInit;
   const transcript = await transcribeSpeech({
     audioBytes: Buffer.from([1, 2, 3, 4]),
     mimeType: "audio/webm",
-    language: "gu",
-    apiKey: "test-gemini-key",
+    language: "ta",
+    apiKey: "test-openai-key",
     model: "test-transcription-model",
     fetchImpl: async (url, init) => {
       requestedUrl = url;
       requestInit = init;
-      return Response.json({
-        candidates: [
-          {
-            content: {
-              parts: [{ text: JSON.stringify({ transcript: "બોટલ" }) }],
-            },
-          },
-        ],
-      });
+      return Response.json({ text: "பாட்டில்" });
     },
   });
 
   assert.equal(
     requestedUrl,
-    "https://generativelanguage.googleapis.com/v1beta/models/test-transcription-model:generateContent",
+    "https://api.openai.com/v1/audio/transcriptions",
   );
-  assert.equal(requestInit.headers["x-goog-api-key"], "test-gemini-key");
-  assert.equal(requestInit.headers["content-type"], "application/json");
-  const requestBody = JSON.parse(requestInit.body);
-  assert.match(requestBody.contents[0].parts[0].text, /Gujarati \(gu-IN\)/);
-  assert.equal(requestBody.contents[0].parts[1].inlineData.mimeType, "audio/webm");
-  assert.equal(requestBody.contents[0].parts[1].inlineData.data, "AQIDBA==");
-  assert.equal(requestBody.generationConfig.maxOutputTokens, 30);
-  assert.deepEqual(requestBody.generationConfig.responseJsonSchema.required, ["transcript"]);
-  assert.equal(transcript, "બોટલ");
+  assert.equal(requestInit.headers.authorization, "Bearer test-openai-key");
+  assert.equal(requestInit.headers["content-type"], undefined);
+  assert.ok(requestInit.body instanceof FormData);
+  assert.equal(requestInit.body.get("model"), "test-transcription-model");
+  assert.equal(requestInit.body.get("language"), "ta");
+  assert.equal(requestInit.body.get("response_format"), "json");
+  assert.match(requestInit.body.get("prompt"), /Tamil \(ta-IN\)/);
+  const audioFile = requestInit.body.get("file");
+  assert.ok(audioFile instanceof File);
+  assert.equal(audioFile.name, "pronunciation.webm");
+  assert.equal(audioFile.type, "audio/webm");
+  assert.deepEqual(Buffer.from(await audioFile.arrayBuffer()), Buffer.from([1, 2, 3, 4]));
+  assert.equal(transcript, "பாட்டில்");
 });
 
-test("Gemini identification minimizes output, prompt, and image tokens", async () => {
+test("OpenAI identification minimizes output and image tokens", async () => {
   let requestedUrl;
   let requestInit;
   let requestBody;
@@ -306,7 +306,7 @@ test("Gemini identification minimizes output, prompt, and image tokens", async (
     imageBytes: Buffer.from([1, 2, 3]),
     mimeType: "image/png",
     language: "ml",
-    apiKey: "test-gemini-key",
+    apiKey: "test-openai-key",
     model: "test-vision-model",
     fetchImpl: async (url, init) => {
       requestedUrl = url;
@@ -314,19 +314,19 @@ test("Gemini identification minimizes output, prompt, and image tokens", async (
       requestBody = JSON.parse(init.body);
       return new Response(
         JSON.stringify({
-          candidates: [
+          output: [
             {
-              content: {
-                parts: [
-                  {
-                    text: JSON.stringify({
-                      objectName: "കപ്പ്",
-                      englishName: "cup",
-                      phoneticSpelling: "kappu",
-                    }),
-                  },
-                ],
-              },
+              type: "message",
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    objectName: "കപ്പ്",
+                    englishName: "cup",
+                    pronunciationGuide: "kapp",
+                  }),
+                },
+              ],
             },
           ],
         }),
@@ -337,30 +337,33 @@ test("Gemini identification minimizes output, prompt, and image tokens", async (
 
   assert.equal(
     requestedUrl,
-    "https://generativelanguage.googleapis.com/v1beta/models/test-vision-model:generateContent",
+    "https://api.openai.com/v1/responses",
   );
-  assert.equal(requestInit.headers["x-goog-api-key"], "test-gemini-key");
-  assert.equal(requestBody.generationConfig.maxOutputTokens, 90);
-  assert.equal(requestBody.generationConfig.mediaResolution, "MEDIA_RESOLUTION_LOW");
-  assert.equal(requestBody.generationConfig.responseMimeType, "application/json");
-  assert.match(requestBody.contents[0].parts[0].text, /Malayalam/);
-  assert.equal(requestBody.contents[0].parts[1].inlineData.mimeType, "image/png");
-  assert.equal(requestBody.contents[0].parts[1].inlineData.data, "AQID");
+  assert.equal(requestInit.headers.authorization, "Bearer test-openai-key");
+  assert.equal(requestBody.model, "test-vision-model");
+  assert.equal(requestBody.store, false);
+  assert.deepEqual(requestBody.reasoning, { effort: "none" });
+  assert.equal(requestBody.max_output_tokens, 90);
+  assert.match(requestBody.instructions, /syllable by syllable/);
+  assert.match(requestBody.instructions, /must not be the English translation/);
+  assert.equal(requestBody.input[0].content[1].type, "input_image");
+  assert.equal(requestBody.input[0].content[1].detail, "low");
+  assert.equal(requestBody.input[0].content[1].image_url, "data:image/png;base64,AQID");
   assert.equal(result.sentence, "ഇത് ഒരു കപ്പ് ആണ്.");
   assert.equal(result.englishName, "cup");
-  assert.equal(result.phoneticSpelling, "kappu");
-  assert.deepEqual(requestBody.generationConfig.responseJsonSchema.required, [
+  assert.equal(result.pronunciationGuide, "kapp");
+  assert.deepEqual(requestBody.text.format.schema.required, [
     "objectName",
     "englishName",
-    "phoneticSpelling",
+    "pronunciationGuide",
   ]);
 });
 
 test("Maya request uses Maya 2 Native and raw PCM is wrapped as WAV", async () => {
   let requestBody;
   const wav = await synthesizeSpeech({
-    text: "यह एक किताब है।",
-    language: "hi",
+    text: "ಇದು ಒಂದು ಪುಸ್ತಕ.",
+    language: "kn",
     voice: "Ananya",
     apiKey: "test-maya-key",
     fetchImpl: async (_url, init) => {
@@ -375,8 +378,8 @@ test("Maya request uses Maya 2 Native and raw PCM is wrapped as WAV", async () =
   assert.deepEqual(requestBody, {
     model: "Maya 2 Native",
     voice: "Ananya",
-    language: "hi",
-    text: "यह एक किताब है।",
+    language: "kn",
+    text: "ಇದು ಒಂದು ಪುಸ್ತಕ.",
   });
   assert.equal(wav.subarray(0, 4).toString(), "RIFF");
   assert.equal(wav.subarray(8, 12).toString(), "WAVE");

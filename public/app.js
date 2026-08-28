@@ -1,4 +1,4 @@
-export function normalizeWord(value, language = "en-IN") {
+export function normalizeWord(value, language = "ml-IN") {
   return value
     .normalize("NFKC")
     .toLocaleLowerCase(language)
@@ -27,7 +27,7 @@ export function editDistance(left, right) {
   return previous[b.length] ?? a.length;
 }
 
-export function soundsCorrect(transcript, targetWord, language = "en-IN") {
+export function soundsCorrect(transcript, targetWord, language = "ml-IN") {
   const expected = normalizeWord(targetWord, language);
   const heard = normalizeWord(transcript, language);
   if (!expected || !heard) return false;
@@ -217,7 +217,7 @@ function enhancePage() {
   const resultAudio = card.querySelector("[data-result-audio]");
   const repeatButton = card.querySelector("[data-repeat-audio]");
   const targetWord = card.dataset.targetWord?.trim() || "";
-  const language = card.dataset.language || "en-IN";
+  const language = card.dataset.language || "ml-IN";
   const languageCode = language.split("-")[0].toLocaleLowerCase();
   let recorder;
   let recordingStream;
